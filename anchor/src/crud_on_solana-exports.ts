@@ -21,7 +21,7 @@ export function getCrudOnSolanaProgramId(cluster: Cluster) {
     case 'devnet':
     case 'testnet':
       // This is the program ID for the CrudOnSolana program on devnet and testnet.
-      return new PublicKey('coUnmi3oBUtwtd9fjeAvSsJssXh5A5xyPbhpewyzRVF')
+      return new PublicKey('2vP3NBeycF7fhm66QcecEE1YmsGFiGWeDZXVSxaLNJzR')
     case 'mainnet-beta':
     default:
       return CRUD_ON_SOLANA_PROGRAM_ID

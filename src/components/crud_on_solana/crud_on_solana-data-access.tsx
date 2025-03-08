@@ -9,7 +9,11 @@ import toast from 'react-hot-toast'
 import { useCluster } from '../cluster/cluster-data-access'
 import { useAnchorProvider } from '../solana/solana-provider'
 import { useTransactionToast } from '../ui/ui-layout'
-
+interface Createentryargs{
+  title: string;
+  body: string;
+  owner: PublicKey;
+}
 export function useCrudOnSolanaProgram() {
   const { connection } = useConnection()
   const { cluster } = useCluster()
@@ -20,7 +24,7 @@ export function useCrudOnSolanaProgram() {
 
   const accounts = useQuery({
     queryKey: ['crud_on_solana', 'all', { cluster }],
-    queryFn: () => program.account.crud_on_solana.all(),
+    queryFn: () => program.account.journalist.all(),
   })
 
   const getProgramAccount = useQuery({
@@ -28,13 +32,19 @@ export function useCrudOnSolanaProgram() {
     queryFn: () => connection.getParsedAccountInfo(programId),
   })
 
-  const initialize = useMutation({
-    mutationKey: ['crud_on_solana', 'initialize', { cluster }],
-    mutationFn: (keypair: Keypair) =>
-      program.methods.initialize().accounts({ crud_on_solana: keypair.publicKey }).signers([keypair]).rpc(),
+  const createEntry = useMutation<string, Error, Createentryargs>({
+    mutationKey: ["journalEntry", "create", { cluster }],
+    mutationFn: async ({ title,body, owner }) => {
+      const [journalEntryAddress] = await PublicKey.findProgramAddress(
+        [Buffer.from(title), owner.toBuffer()],
+        programId
+      );
+
+      return program.methods.create(title, body).rpc();
+    },
     onSuccess: (signature) => {
-      transactionToast(signature)
-      return accounts.refetch()
+      transactionToast(signature);
+      accounts.refetch();
     },
     onError: () => toast.error('Failed to initialize account'),
   })
@@ -44,61 +54,49 @@ export function useCrudOnSolanaProgram() {
     programId,
     accounts,
     getProgramAccount,
-    initialize,
+    createEntry,
   }
 }
 
 export function useCrudOnSolanaProgramAccount({ account }: { account: PublicKey }) {
   const { cluster } = useCluster()
   const transactionToast = useTransactionToast()
+  const programId = useMemo(() => getCrudOnSolanaProgramId(cluster.network as Cluster), [cluster])
   const { program, accounts } = useCrudOnSolanaProgram()
 
   const accountQuery = useQuery({
     queryKey: ['crud_on_solana', 'fetch', { cluster, account }],
-    queryFn: () => program.account.crud_on_solana.fetch(account),
+    queryFn: () => program.account.journalist.fetch(account),
   })
+  const upgradeEntry = useMutation<string, Error, Createentryargs>({
+    mutationKey: ["journalEntry", "create", { cluster }],
+    mutationFn: async ({ title, body, owner }) => {
+      const [journalEntryAddress] = await PublicKey.findProgramAddress(
+        [Buffer.from(title), owner.toBuffer()],
+        programId
+      );
 
-  const closeMutation = useMutation({
-    mutationKey: ['crud_on_solana', 'close', { cluster, account }],
-    mutationFn: () => program.methods.close().accounts({ crud_on_solana: account }).rpc(),
-    onSuccess: (tx) => {
-      transactionToast(tx)
-      return accounts.refetch()
+      return program.methods.update(title, body).rpc();
     },
-  })
-
-  const decrementMutation = useMutation({
-    mutationKey: ['crud_on_solana', 'decrement', { cluster, account }],
-    mutationFn: () => program.methods.decrement().accounts({ crud_on_solana: account }).rpc(),
-    onSuccess: (tx) => {
-      transactionToast(tx)
-      return accountQuery.refetch()
+    onSuccess: (signature) => {
+      transactionToast(signature);
+      accounts.refetch();
     },
-  })
-
-  const incrementMutation = useMutation({
-    mutationKey: ['crud_on_solana', 'increment', { cluster, account }],
-    mutationFn: () => program.methods.increment().accounts({ crud_on_solana: account }).rpc(),
+    onError: () => toast.error('Failed to initialize account'),
+  });
+  const deleteEntry = useMutation({
+    mutationKey: ["journal", "deleteEntry", { cluster, account }],
+    mutationFn: (title: string) =>
+      program.methods.delete(title).rpc(),
     onSuccess: (tx) => {
-      transactionToast(tx)
-      return accountQuery.refetch()
+      transactionToast(tx);
+      return accounts.refetch();
     },
-  })
-
-  const setMutation = useMutation({
-    mutationKey: ['crud_on_solana', 'set', { cluster, account }],
-    mutationFn: (value: number) => program.methods.set(value).accounts({ crud_on_solana: account }).rpc(),
-    onSuccess: (tx) => {
-      transactionToast(tx)
-      return accountQuery.refetch()
-    },
-  })
-
+  });
+  
   return {
     accountQuery,
-    closeMutation,
-    decrementMutation,
-    incrementMutation,
-    setMutation,
+    upgradeEntry,
+    deleteEntry,
   }
 }
