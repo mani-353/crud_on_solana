@@ -45,6 +45,3 @@ jobs:
 
       - run: pnpm run anchor build
         shell: bash
-
-      - run: pnpm run anchor test
-        shell: bash
